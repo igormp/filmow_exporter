@@ -1,17 +1,14 @@
 import requests
-import requests
 from bs4 import BeautifulSoup
 
 
 class Parser:
     def __init__(self, user):
         self.page = 1
-        self.total_files = 1
         self.soup = BeautifulSoup(features="html.parser")
 
         self.user = user
         self.movies_parsed = 0
-        self.total_files = 1
 
         self.parse(user)
 
@@ -34,53 +31,59 @@ class Parser:
             if soup.find("h1").text == "Vixi! - Página não encontrada":
                 raise Exception
 
-            for title in soup.find_all("li", {"class": "movie_list_item"}):
-                # print(title)
-                print(
-                    title.findChild("span", {"class": "star-rating"}).get(
-                        "data-original-title"
-                    )
+            for movie in soup.find_all("li", {"class": "movie_list_item"}):
+                nota = (
+                    movie.findChild("span", {"class": "star-rating"})
+                    .get("title")
+                    .split(" ")[1]
                 )
-                break
-                print(self.parse_movie("https://filmow.com" + title.get("href")))
+
+                movie_page = movie.findChild("a", {"class": "tip-movie"}).get("href")
+                title, director, year = self.parse_movie(
+                    "https://filmow.com" + movie_page
+                )
+                print(title, director, year, nota)
                 self.movies_parsed += 1
                 break
             self.page += 1
             break
 
     def parse_movie(self, url):
-        print(url)
-        movie = {"title": None, "director": None, "year": None}
+
+        title = None
+        director = None
+        year = None
+
         source_code = requests.get(url).text
         soup = BeautifulSoup(source_code, "html.parser")
 
         try:
-            movie["title"] = (
+            title = (
                 soup.find("h2", {"class": "movie-original-title"}).get_text().strip()
             )
         except AttributeError:
-            movie["title"] = soup.find("h1").get_text().strip()
+            title = soup.find("h1").get_text().strip()
 
         try:
-            movie["director"] = (
+            director = (
                 soup.find("span", {"itemprop": "director"})
                 .select("strong")[0]
                 .get_text()
             )
         except AttributeError:
             try:
-                movie["director"] = (
+                director = (
                     soup.find("span", {"itemprop": "directors"}).getText().strip()
                 )
             except AttributeError:
-                movie["director"] = ""
+                director = None
 
         try:
-            movie["year"] = soup.find("small", {"class": "release"}).get_text()
+            year = soup.find("small", {"class": "release"}).get_text()
         except AttributeError:
-            movie["year"] = ""
+            year = None
 
-        return movie
+        return (title, director, year)
 
     def get_last_page(self, user):
         url = "https://filmow.com/usuario/" + user + "/filmes/ja-vi/"
