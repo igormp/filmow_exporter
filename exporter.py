@@ -1,6 +1,7 @@
 import re
 import requests
 
+import asyncio
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -11,14 +12,14 @@ class Parser:
         self.soup = BeautifulSoup(features="html.parser")
 
         self.user = user
-        self.movies_parsed = 0
 
         # List containing tuples of (title, director, year, rating)
         self.movies_list = []
 
-        self.parse(user)
+    async def init(self):
+        await self.parse(self.user)
 
-    def parse(self, user):
+    async def parse(self, user):
         self.page = 1
         last_page = self.__get_last_page(user)
 
@@ -37,8 +38,7 @@ class Parser:
             if soup.find("h1").text == "Vixi! - Página não encontrada":
                 raise Exception
 
-            for movie in soup.find_all("li", {"class": "movie_list_item"}):
-
+            async def get_movie_info(movie):
                 nota = (
                     movie.findChild("span", {"class": "star-rating"})
                     .get("title")
@@ -49,8 +49,17 @@ class Parser:
                 title, director, year = self.__parse_movie(
                     "https://filmow.com" + movie_page
                 )
-                self.movies_list.append((title, director, year, nota))
-                self.movies_parsed += 1
+                return (title, director, year, nota)
+
+            page_res = await asyncio.gather(
+                *[
+                    get_movie_info(movie)
+                    for movie in soup.find_all("li", {"class": "movie_list_item"})
+                ]
+            )
+
+            self.movies_list.extend(page_res)
+
             self.page += 1
             break
 
@@ -117,6 +126,13 @@ class Parser:
             return 1
 
 
-parse = Parser("imp2")
+def main():
+    parse = Parser("imp2")
 
-parse.write_csv()
+    asyncio.get_event_loop().run_until_complete(parse.init())
+
+    parse.write_csv()
+
+
+if __name__ == "__main__":
+    main()
