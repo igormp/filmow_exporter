@@ -23,12 +23,12 @@ class Parser:
         self.page = 1
         last_page = self.__get_last_page(user)
 
-        while self.page <= last_page:
+        async def parse_page(page):
             url = (
                 "https://filmow.com/usuario/"
                 + user
                 + "/filmes/ja-vi/?pagina="
-                + str(self.page)
+                + str(page)
             )
 
             source_code = requests.get(url).text
@@ -39,11 +39,14 @@ class Parser:
                 raise Exception
 
             async def get_movie_info(movie):
-                nota = (
-                    movie.findChild("span", {"class": "star-rating"})
-                    .get("title")
-                    .split(" ")[1]
-                )
+                try:
+                    nota = (
+                        movie.findChild("span", {"class": "star-rating"})
+                        .get("title")
+                        .split(" ")[1]
+                    )
+                except AttributeError:
+                    nota = None
 
                 movie_page = movie.findChild("a", {"class": "tip-movie"}).get("href")
                 title, director, year = self.__parse_movie(
@@ -58,10 +61,14 @@ class Parser:
                 ]
             )
 
-            self.movies_list.extend(page_res)
+            return page_res
 
-            self.page += 1
-            break
+        self.movies_list = await asyncio.gather(
+            *[parse_page(page) for page in range(1, last_page + 1)]
+        )
+
+        # flatten our list
+        self.movies_list = [item for sublist in self.movies_list for item in sublist]
 
     def get_df(self):
         cols = ["Title", "Directors", "Year", "Rating"]
