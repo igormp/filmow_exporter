@@ -137,7 +137,7 @@ class Parser:
             ]
             match = re.search(r"pagina=(\d*)", str(tag)).group(1)
             return int(match)
-        except:
+        except Exception:
             return 1
 
 
