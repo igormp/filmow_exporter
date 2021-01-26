@@ -13,6 +13,10 @@ class Parser:
 
         self.user = user
 
+        self.total_pages = 1
+
+        self.pages_done = 0
+
         # List containing tuples of (title, director, year, rating)
         self.movies_list = []
 
@@ -22,7 +26,7 @@ class Parser:
 
     async def parse(self, user):
         self.page = 1
-        last_page = await self.__get_last_page(user)
+        self.total_pages = await self.__get_last_page(user)
 
         async def parse_page(page):
             url = (
@@ -62,10 +66,12 @@ class Parser:
                 ]
             )
 
+            self.pages_done += 1
+
             return page_res
 
         self.movies_list = await asyncio.gather(
-            *[parse_page(page) for page in range(1, last_page + 1)]
+            *[parse_page(page) for page in range(1, self.total_pages + 1)]
         )
 
         # flatten our list
@@ -140,11 +146,18 @@ class Parser:
         except Exception:
             return 1
 
+    async def display_status(self):
+        while self.pages_done < self.total_pages:
+            await asyncio.sleep(1)
+            print("done: ", self.pages_done)
+
 
 def main():
     parse = Parser("imp2")
 
-    asyncio.get_event_loop().run_until_complete(parse.init())
+    asyncio.get_event_loop().run_until_complete(
+        asyncio.wait([parse.init(), parse.display_status()])
+    )
 
     parse.write_csv()
 
