@@ -1,7 +1,7 @@
 import re
-import requests
 
 import asyncio
+import aiohttp
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -17,11 +17,12 @@ class Parser:
         self.movies_list = []
 
     async def init(self):
+        self.session = aiohttp.ClientSession()
         await self.parse(self.user)
 
     async def parse(self, user):
         self.page = 1
-        last_page = self.__get_last_page(user)
+        last_page = await self.__get_last_page(user)
 
         async def parse_page(page):
             url = (
@@ -31,7 +32,7 @@ class Parser:
                 + str(page)
             )
 
-            source_code = requests.get(url).text
+            source_code = await self.__fetch(url)
 
             soup = BeautifulSoup(source_code, "html.parser")
 
@@ -49,7 +50,7 @@ class Parser:
                     nota = None
 
                 movie_page = movie.findChild("a", {"class": "tip-movie"}).get("href")
-                title, director, year = self.__parse_movie(
+                title, director, year = await self.__parse_movie(
                     "https://filmow.com" + movie_page
                 )
                 return (title, director, year, nota)
@@ -70,6 +71,8 @@ class Parser:
         # flatten our list
         self.movies_list = [item for sublist in self.movies_list for item in sublist]
 
+        self.session.close()
+
     def get_df(self):
         cols = ["Title", "Directors", "Year", "Rating"]
         df = pd.DataFrame(self.movies_list, columns=cols)
@@ -79,13 +82,18 @@ class Parser:
         df = self.get_df()
         df.to_csv(self.user + ".csv", index=False)
 
-    def __parse_movie(self, url):
+    async def __fetch(self, url):
+        async with self.session.get(url) as response:
+            return await response.text()
+
+    async def __parse_movie(self, url):
 
         title = None
         director = None
         year = None
 
-        source_code = requests.get(url).text
+        source_code = await self.__fetch(url)
+
         soup = BeautifulSoup(source_code, "html.parser")
 
         try:
@@ -116,10 +124,10 @@ class Parser:
 
         return (title, director, year)
 
-    def __get_last_page(self, user):
+    async def __get_last_page(self, user):
         url = "https://filmow.com/usuario/" + user + "/filmes/ja-vi/"
 
-        source_code = requests.get(url).text
+        source_code = await self.__fetch(url)
 
         soup = BeautifulSoup(source_code, "html.parser")
 
@@ -134,7 +142,7 @@ class Parser:
 
 
 def main():
-    parse = Parser("imp2")
+    parse = Parser("sem_registro")
 
     asyncio.get_event_loop().run_until_complete(parse.init())
 
