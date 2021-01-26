@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 class Parser:
     def __init__(self, user):
         self.page = 1
-        self.soup = BeautifulSoup(features="html.parser")
+        self.soup = BeautifulSoup(features="lxml")
 
         self.user = user
 
@@ -34,7 +34,7 @@ class Parser:
 
             source_code = await self.__fetch(url)
 
-            soup = BeautifulSoup(source_code, "html.parser")
+            soup = BeautifulSoup(source_code, "lxml")
 
             if soup.find("h1").text == "Vixi! - Página não encontrada":
                 raise Exception
@@ -71,7 +71,7 @@ class Parser:
         # flatten our list
         self.movies_list = [item for sublist in self.movies_list for item in sublist]
 
-        self.session.close()
+        await self.session.close()
 
     def get_df(self):
         cols = ["Title", "Directors", "Year", "Rating"]
@@ -94,7 +94,7 @@ class Parser:
 
         source_code = await self.__fetch(url)
 
-        soup = BeautifulSoup(source_code, "html.parser")
+        soup = BeautifulSoup(source_code, "lxml")
 
         try:
             title = (
@@ -129,7 +129,7 @@ class Parser:
 
         source_code = await self.__fetch(url)
 
-        soup = BeautifulSoup(source_code, "html.parser")
+        soup = BeautifulSoup(source_code, "lxml")
 
         try:
             tag = list(soup.find("div", {"class": "pagination"}).find("ul").children)[
@@ -142,7 +142,7 @@ class Parser:
 
 
 def main():
-    parse = Parser("sem_registro")
+    parse = Parser("imp2")
 
     asyncio.get_event_loop().run_until_complete(parse.init())
 
