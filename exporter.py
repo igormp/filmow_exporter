@@ -6,7 +6,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 
-class Parser:
+class Exporter:
     def __init__(self, user):
         self.page = 1
         self.soup = BeautifulSoup(features="lxml")
@@ -22,16 +22,33 @@ class Parser:
 
     async def init(self):
         self.session = aiohttp.ClientSession()
+
+        valid = await self.valid_user()
+
+        if not valid:
+            return False
+
         await self.parse(self.user)
 
-    async def parse(self, user):
+    async def valid_user(self):
+        url = "https://filmow.com/usuario/" + self.user
+        source_code = await self.__fetch(url)
+
+        soup = BeautifulSoup(source_code, "lxml")
+
+        if soup.find("h1").text == "Vixi! - Página não encontrada":
+            return False
+
+        return True
+
+    async def parse(self):
         self.page = 1
-        self.total_pages = await self.__get_last_page(user)
+        self.total_pages = await self.__get_last_page(self.user)
 
         async def parse_page(page):
             url = (
                 "https://filmow.com/usuario/"
-                + user
+                + self.user
                 + "/filmes/ja-vi/?pagina="
                 + str(page)
             )
@@ -130,8 +147,8 @@ class Parser:
 
         return (title, director, year)
 
-    async def __get_last_page(self, user):
-        url = "https://filmow.com/usuario/" + user + "/filmes/ja-vi/"
+    async def __get_last_page(self):
+        url = "https://filmow.com/usuario/" + self.user + "/filmes/ja-vi/"
 
         source_code = await self.__fetch(url)
 
@@ -153,7 +170,7 @@ class Parser:
 
 
 def main():
-    parse = Parser("imp2")
+    parse = Exporter("imp2")
 
     asyncio.get_event_loop().run_until_complete(
         asyncio.wait([parse.init(), parse.display_status()])
