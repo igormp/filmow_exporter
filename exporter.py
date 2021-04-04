@@ -3,7 +3,9 @@ import re
 import asyncio
 import aiohttp
 import pandas as pd
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
+import time
+import cchardet
 
 
 class Exporter:
@@ -28,9 +30,11 @@ class Exporter:
         if not valid:
             return False
 
-        await self.parse(self.user)
+        print("Starting to parse user data...")
+        # await self.parse()
 
     async def valid_user(self):
+        print("Checking user...")
         url = "https://filmow.com/usuario/" + self.user
         source_code = await self.__fetch(url)
 
@@ -43,7 +47,9 @@ class Exporter:
 
     async def parse(self):
         self.page = 1
-        self.total_pages = await self.__get_last_page(self.user)
+        self.total_pages = await self.__get_last_page()
+
+        print(f"Parsing all {self.total_pages} pages...")
 
         async def parse_page(page):
             url = (
@@ -52,7 +58,7 @@ class Exporter:
                 + "/filmes/ja-vi/?pagina="
                 + str(page)
             )
-
+            print("Parsing page", page)
             source_code = await self.__fetch(url)
 
             soup = BeautifulSoup(source_code, "lxml")
@@ -71,7 +77,7 @@ class Exporter:
                     nota = None
 
                 movie_page = movie.findChild("a", {"class": "tip-movie"}).get("href")
-                title, director, year = await self.__parse_movie(
+                title, director, year = await self.parse_movie(
                     "https://filmow.com" + movie_page
                 )
                 return (title, director, year, nota)
@@ -106,18 +112,20 @@ class Exporter:
         df.to_csv(self.user + ".csv", index=False)
 
     async def __fetch(self, url):
+        # async with self.session.get(url, allow_redirects=False) as response:
         async with self.session.get(url) as response:
             return await response.text()
 
-    async def __parse_movie(self, url):
-
+    # @profile
+    async def parse_movie(self, url):
         title = None
         director = None
         year = None
 
         source_code = await self.__fetch(url)
 
-        soup = BeautifulSoup(source_code, "lxml")
+        strainer = SoupStrainer(["h1", "h2", "span", "small"])
+        soup = BeautifulSoup(source_code, "lxml", parse_only=strainer)
 
         try:
             title = (
@@ -144,12 +152,13 @@ class Exporter:
             year = soup.find("small", {"class": "release"}).get_text()
         except AttributeError:
             year = None
-
+        print(title, director, year)
         return (title, director, year)
 
     async def __get_last_page(self):
         url = "https://filmow.com/usuario/" + self.user + "/filmes/ja-vi/"
 
+        print("Getting total page number...")
         source_code = await self.__fetch(url)
 
         soup = BeautifulSoup(source_code, "lxml")
@@ -171,12 +180,17 @@ class Exporter:
 
 def main():
     parse = Exporter("imp2")
-
-    asyncio.get_event_loop().run_until_complete(
-        asyncio.wait([parse.init(), parse.display_status()])
-    )
-
-    parse.write_csv()
+    # start = time.time()
+    # asyncio.get_event_loop().run_until_complete(
+    #     # asyncio.wait([parse.init(), parse.display_status()])
+    #     asyncio.wait([parse.init()])
+    # )
+    # print(f"Took {time.time() - start} seconds")
+    # parse.write_csv()
+    p = "https://filmow.com/o-exterminador-do-futuro-2-o-julgamento-final-t766/"
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.wait([parse.init()]))
+    loop.run_until_complete(asyncio.wait([parse.parse_movie(p)]))
 
 
 if __name__ == "__main__":
